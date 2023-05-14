@@ -1,21 +1,17 @@
 import os
 import sys
-sys.path.append(os.getcwd())
 from PIL import Image,ImageDraw,ImageFont
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 from tqdm import tqdm
-from common_ocr_det.iaas.add_bg import AddBackground
-from common_ocr_det.iaas.add_watermark import AddWatermark
-from common_ocr_det.iaas.add_transparent import AddCharsBehind
+from augs import AddBackground, AddTransparent, AddWatermark
 import glob
 from itertools import chain
 import random
-from matplotlib import font_manager
 import imgaug.augmenters as iaa
 import imgaug as ia
 from enum import Enum
 from tqdm import trange
-import os
 import cv2
 import numpy as np
 import argparse
@@ -201,8 +197,6 @@ class Instance(object):
                 self.width += (len(text) - 1) * self.char_spacing
                     
 
-    
-
 class DetectionCaseGenerator(object):
     def __init__(self, ttf_paths, canvas_pil, font_size, line_spacing, save_dir, char_spacing=0, instance_image_dir_dict=None) -> None:
         assert isinstance(canvas_pil, Image.Image), type(canvas_pil)
@@ -235,10 +229,9 @@ class DetectionCaseGenerator(object):
         self.letter_w, self.letter_h = self.image_font["no_hanzi_font"].getsize("g")
     
     def init_hanzis(self):
-        with open("/data1/mchk/mmdetection_for_common_ocr/pgs/zidian_new_5883.txt", 'r') as f:
-            lines = [l.strip() for l in f.readlines()]
-        lines = lines[:3500]
-        self.hanzis = lines
+        with open("assets/zidian_new_5883.txt", 'r', encoding="utf-8") as f:
+            text = f.read()
+            self.hanzis = list(text)
 
     
     def put_instance(self, instance, tl_x, tl_y, center_y=None):
@@ -355,7 +348,7 @@ class DetectionCaseGenerator(object):
             ),
             # 添加水印
             iaa.Sometimes(0.2,
-                AddWatermark("/data1/mchk/mmdetection_for_common_ocr/ttfs/cn"),
+                AddWatermark("assets/fonts/cn"),
             ),
             iaa.Sometimes(0.1,
                 iaa.AdditiveGaussianNoise(scale=0.5*2),
@@ -946,16 +939,16 @@ if __name__ == "__main__":
             CHAR_SPACING = 0
             img = Image.new("RGB", (W, H), (255, 255, 255))
 
-        cn_font_paths = glob.glob(os.path.join("/data1/mchk/mmdetection_for_common_ocr/ttfs/cn", "*.ttf"))
-        en_font_paths = glob.glob(os.path.join("/data1/mchk/mmdetection_for_common_ocr/ttfs/en", "*.ttf"))
+        cn_font_paths = glob.glob(os.path.join("assets/fonts/cn", "*.ttf"))
+        en_font_paths = glob.glob(os.path.join("assets/fonts/en", "*.ttf"))
         
-        cn_font_path = "/data1/mchk/mmdetection_for_common_ocr/ttfs/cn/SimSun.ttf"
-        en_font_path = "/data1/mchk/mmdetection_for_common_ocr/ttfs/en/TimesNewRoman.ttf"
+        cn_font_path = "assets/fonts/cn/SimSun.ttf"
+        en_font_path = "assets/fonts/en/TimesNewRoman.ttf"
 
         # if np.random.randint(0, 10) < 3:
             # cn_font_path = random.sample(cn_font_paths, 1)[0]
         if np.random.randint(0, 10) < 5:
-            cn_font_path = "/data1/mchk/mmdetection_for_common_ocr/ttfs/cn/楷体_GB2312.ttf"
+            cn_font_path = "assets/fonts/cn/楷体_GB2312.ttf"
         
 
         g = DetectionCaseGenerator([cn_font_path, en_font_path], img, font_size=FONT_SIZE, line_spacing=LINE_SPACING, char_spacing=CHAR_SPACING,
