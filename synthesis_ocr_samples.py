@@ -1,20 +1,23 @@
 import os
-import sys
-from PIL import Image,ImageDraw,ImageFont
-import matplotlib.pyplot as plt
-from matplotlib import font_manager
-from tqdm import tqdm
-from augs import AddBackground, AddTransparent, AddWatermark
-import glob
-from itertools import chain
 import random
-import imgaug.augmenters as iaa
-import imgaug as ia
 from enum import Enum
-from tqdm import trange
+from itertools import chain
+import argparse
+from tqdm import tqdm, trange
+import glob
+
+from PIL import Image, ImageDraw, ImageFont
 import cv2
 import numpy as np
-import argparse
+
+import matplotlib.pyplot as plt
+from matplotlib import font_manager
+
+import imgaug.augmenters as iaa
+import imgaug as ia
+
+from augs import AddBackground, AddTransparent, AddWatermark
+from utils.parse_yaml import parse_yaml_config
 
 
 print("注意，latex图像必须是png格式，jpg不予考虑")
@@ -24,58 +27,16 @@ class Category(Enum):
     HTEXT         = 1
     PFORMULA      = 2
     HFORMULA      = 3
-    LD            = 4
-    NLD           = 5
-    OC            = 6
-    MIXFORMULA    = 7
-    GRAPH         = 8
-    EXCEL         = 9
-    P_FORMULA_SET = 10
-    P_UP_DOWN     = 11
-    H_FORMULA_SET = 12
-    H_UP_DOWN     = 13
-    SUBFIELD      = 14
-
 
 PTEXT         = Category.PTEXT
 HTEXT         = Category.HTEXT
 PFORMULA      = Category.PFORMULA
 HFORMULA      = Category.HFORMULA
-LD            = Category.LD
-NLD           = Category.NLD
-OC            = Category.OC
-MIXFORMULA    = Category.MIXFORMULA
-GRAPH         = Category.GRAPH
-EXCEL         = Category.EXCEL
-P_FORMULA_SET = Category.P_FORMULA_SET
-P_UP_DOWN     = Category.P_UP_DOWN
-H_FORMULA_SET = Category.H_FORMULA_SET
-H_UP_DOWN     = Category.H_UP_DOWN
-SUBFIELD      = Category.SUBFIELD
 
-
-ALL_CATEGORIES = [PTEXT, HTEXT, PFORMULA, HFORMULA, LD, NLD, OC, MIXFORMULA,
-                    GRAPH, EXCEL, P_FORMULA_SET, P_UP_DOWN, H_FORMULA_SET,H_UP_DOWN, SUBFIELD]
-
-
-song_ttf_path = "/data1/mchk/mmdetection_for_common_ocr/pgs/SimSun.ttf"
-times_new_roman_ttf_path = "/data1/mchk/mmdetection_for_common_ocr/pgs/TimesNewRoman.ttf"
 
 MAX_LENGTH = 1333
 MIN_PFORMULA_HEIGHT = 15
 MIN_HFORMULA_HEIGHT = 15
-
-def draw_single_char(ch, font, canvas_size, x_offset, y_offset):
-    img = Image.new("RGB", (canvas_size, canvas_size), (255, 255, 255))
-    draw = ImageDraw.Draw(img)
-    draw.text((x_offset, y_offset), ch * 3, (0, 0, 0), font=font)
-    return img
-
-def draw_example(ch, src_font, canvas_size, x_offset, y_offset):
-    src_img = draw_single_char(ch, src_font, canvas_size, x_offset, y_offset)
-    example_img = Image.new("RGB", (canvas_size, canvas_size), (255, 255, 255))
-    example_img.paste(src_img, (0, 0))
-    return example_img
 
 SHENG = \
 '''
@@ -133,6 +94,7 @@ e
 i
 '''.split()
 
+
 class Instance(object):
     def __init__(self, parent, text, category, is_path=False, char_spacing=0) -> None:
         super().__init__()
@@ -168,7 +130,7 @@ class Instance(object):
                 print("---", self.height)
             self.image_np = cv2.resize(self.image_np, (self.width, self.height))
         else:
-            self.height = self.parent.letter_h
+            # self.height = self.parent.letter_h
             # 一段文本中可能有多种不同的字体，遍历文本，根据内容确定字体，进而确定渲染尺寸
             if self.char_spacing == 0:
                 begin = 0
@@ -176,14 +138,19 @@ class Instance(object):
                 for i in range(len(text)):
                     if text[i] in self.parent.hanzi_font_chars:
                         if font != self.parent.image_font["hanzi_font"]:
-                            self.width += font.getsize(text[begin: i])[0]
+                            w, h = font.getsize(text[begin: i])
+                            self.width += w
+                            self.height = max(self.height, h)
                             begin = i
                             font = self.parent.image_font["hanzi_font"]
+                    elif font != self.parent.image_font["no_hanzi_font"]:
+                        w, h = font.getsize(text[begin: i])
+                        self.width += w
+                        self.height = max(self.height, h)
+                        begin = i
+                        font = self.parent.image_font["no_hanzi_font"]
                     else:
-                        if font != self.parent.image_font["no_hanzi_font"]:
-                            self.width += font.getsize(text[begin: i])[0]
-                            begin = i
-                            font = self.parent.image_font["no_hanzi_font"]
+                        raise NotImplementedError()
                 self.width += font.getsize(text[begin:])[0]
             else:
                 # ！！！这里务必要注意，font.getsize("abc")[0] != sum(font.getsize(k) for k in "abc")
@@ -340,15 +307,7 @@ class DetectionCaseGenerator(object):
             iaa.Affine(translate_px={"x": (1, 5)}, rotate=(-6, 6), cval=255, fit_output=True),
             iaa.Resize({"shorter-side": "keep-aspect-ratio", "longer-side": (MAX_LENGTH if max(h, w) > MAX_LENGTH else max(h, w))}),
             iaa.Sometimes(0.75,
-                AddBackground("/data1/mchk/dataset/common_ocr/base/random_background/neirongyun_cropped/", (0.5, 1)),
-            ),
-            # 添加透字
-            iaa.Sometimes(0.05,
-                AddCharsBehind("/data1/mchk/dataset/common_ocr/base/neirongyun_no_math_1333/images/"),
-            ),
-            # 添加水印
-            iaa.Sometimes(0.2,
-                AddWatermark("assets/fonts/cn"),
+                AddBackground(r"C:\Users\Macta\Desktop\SN2247_2023_05_11_16_53_00\rgb", (0.5, 1)),
             ),
             iaa.Sometimes(0.1,
                 iaa.AdditiveGaussianNoise(scale=0.5*2),
@@ -830,27 +789,15 @@ class DetectionCaseGenerator(object):
         
         return max_height
 
-
-
     # 参数里这个tl_x是一行的起始位置可能的最左端
-    def _put_english_ptext_line(self, tl_y, tl_x=1):
-        pformulas = []
-        formula_num = 0
-        for i in range(formula_num):
-            pformulas.append(self.generate_pformula())
-        
-        pformula_widths = [instance.width for instance in pformulas]
-
-        rest_width = self.canvas_pil.size[0] - sum(pformula_widths)
-        if formula_num == 0:
-            text_num = 1
-        else:
-            text_num = formula_num + np.random.randint(0, 2)
+    def put_ptext_line(self, tl_y, tl_x=1):
+        rest_width = self.canvas_pil.size[0]
+        text_num = 1
         max_ptext_length = rest_width / text_num / (self.letter_w + self.char_spacing)
-        ptexts = [self.generate_ptext(max(10, np.random.randint(0, max(4, max_ptext_length))), main_lang="english") for _ in range(text_num)]
+        ptexts = [self.generate_ptext(max(10, np.random.randint(0, max(4, max_ptext_length))), main_lang="chinese") for _ in range(text_num)]
 
         # ptext和pformula填上去之后剩余的空间宽度
-        rest_width = self.canvas_pil.size[0] - sum(instance.width for instance in pformulas + ptexts)
+        rest_width = self.canvas_pil.size[0] - sum(instance.width for instance in ptexts)
         # 如果剩余空间不足，那么强行指定一个正的起始位置
         if rest_width <= 1:
             tl_x = np.random.randint(1, 10)
@@ -860,18 +807,8 @@ class DetectionCaseGenerator(object):
         # ptext和pformula交替出现
         instances = []
         i = 0
-        j = 0
-        while i < len(ptexts) and j < len(pformulas):
-            instances.append(ptexts[i])
-            instances.append(pformulas[j])
-            i += 1
-            j += 1
         if i < len(ptexts):
             instances.extend(ptexts[i:])
-        elif j < len(pformulas):
-            instances.extend(pformulas[j:])
-
-
         max_height = max(i.height for i in instances)
 
         for i, instance in enumerate(instances):
@@ -900,6 +837,7 @@ def generate_latex(text):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument("src_yaml_path")
     parser.add_argument("save_dir")
     parser.add_argument("generation_num", type=int)
     parser.add_argument("--base-name", type=str, default='')
@@ -907,6 +845,7 @@ if __name__ == "__main__":
     parser.add_argument("--only_small", action="store_true")
     args = parser.parse_args()
 
+    args.src_yaml_path
     os.makedirs(args.save_dir, exist_ok=True)
     image_save_dir = os.path.join(args.save_dir, "images")
     label_save_dir = os.path.join(args.save_dir, "labels")
@@ -915,7 +854,7 @@ if __name__ == "__main__":
 
     for gn in trange(args.generation_num):
         W = np.random.randint(600, 1000)
-        H = np.random.randint(50, 2000)
+        H = np.random.randint(200, 1000)
         FONT_SIZE = np.random.randint(15,30)
         # LINE_SPACING = int(10 / 25 * FONT_SIZE)
         LINE_SPACING = max(3, np.random.randint(int(1 / 5 * FONT_SIZE), int(15 / 25 * FONT_SIZE)))
@@ -942,14 +881,8 @@ if __name__ == "__main__":
         cn_font_paths = glob.glob(os.path.join("assets/fonts/cn", "*.ttf"))
         en_font_paths = glob.glob(os.path.join("assets/fonts/en", "*.ttf"))
         
-        cn_font_path = "assets/fonts/cn/SimSun.ttf"
-        en_font_path = "assets/fonts/en/TimesNewRoman.ttf"
-
-        # if np.random.randint(0, 10) < 3:
-            # cn_font_path = random.sample(cn_font_paths, 1)[0]
-        if np.random.randint(0, 10) < 5:
-            cn_font_path = "assets/fonts/cn/楷体_GB2312.ttf"
-        
+        cn_font_path = random.sample(cn_font_paths, 1)[0]
+        en_font_path = random.sample(en_font_paths, 1)[0]
 
         g = DetectionCaseGenerator([cn_font_path, en_font_path], img, font_size=FONT_SIZE, line_spacing=LINE_SPACING, char_spacing=CHAR_SPACING,
                                     save_dir=args.save_dir, 
@@ -965,22 +898,18 @@ if __name__ == "__main__":
             # tl_y = (g.font_size + g.line_spacing) * i + tl_y_offset
             tl_y += (line_height + g.line_spacing)
 
-            line_height = g.put_pinyin(tl_y)
-            # 一定概率啥也不写
-            # if np.random.randint(0, 8) != 0:
-                # line_height = g.put_htext_graph_line(tl_y, main_lang="chinese")
-                # k = np.random.randint(0, 5)
-                # if k < 3:
-                    # line_height = g.put_formula_ptext_graph_line(tl_y, main_lang="chinese")
-                # elif k == 3:
-                    # line_height = g.put_formula_ptext_graph_line(tl_y, main_lang="mix")
-                # else:
-                    # line_height = g.put_formula_ptext_graph_line(tl_y, main_lang="english")
-                # else:
-                    # line_height = g.put_english_ptext_line(tl_y)
+            # line_height = g.put_htext_graph_line(tl_y, main_lang="chinese")
+            k = np.random.randint(0, 5)
+            if True:
+                line_height = g.put_ptext_line(tl_y)
+            elif k == 3:
+                line_height = g.put_formula_ptext_graph_line(tl_y, main_lang="mix")
+            elif k == 4:
+                line_height = g.put_pinyin(tl_y)
+            else:
+                line_height = g.put_formula_ptext_graph_line(tl_y, main_lang="chinese")
+        # g.aug()
 
-
-        g.aug()
         if args.base_name == '':
             name = "%d" % gn
         else:

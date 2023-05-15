@@ -17,7 +17,7 @@
             "type": "python",
             "request": "launch",
             "program": "synthesis_ocr_samples.py",
-            "args": ["pgs", "312"],
+            "args": ["eee", "pgs", "312"],
             "console": "integratedTerminal",
             "justMyCode": true
         }
