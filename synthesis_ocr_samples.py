@@ -130,36 +130,37 @@ class Instance(object):
                 print("---", self.height)
             self.image_np = cv2.resize(self.image_np, (self.width, self.height))
         else:
-            # self.height = self.parent.letter_h
             # 一段文本中可能有多种不同的字体，遍历文本，根据内容确定字体，进而确定渲染尺寸
             if self.char_spacing == 0:
                 begin = 0
                 font = self.parent.image_font["hanzi_font"]
                 for i in range(len(text)):
-                    if text[i] in self.parent.hanzi_font_chars:
-                        if font != self.parent.image_font["hanzi_font"]:
-                            w, h = font.getsize(text[begin: i])
-                            self.width += w
-                            self.height = max(self.height, h)
-                            begin = i
-                            font = self.parent.image_font["hanzi_font"]
-                    elif font != self.parent.image_font["no_hanzi_font"]:
+                    # 字体发生切换，计算使用上一字体渲染的字符串的尺寸
+                    if text[i] in self.parent.hanzi_font_chars and font != self.parent.image_font["hanzi_font"]:
+                        w, h = font.getsize(text[begin: i])
+                        self.width += w
+                        self.height = max(self.height, h)
+                        begin = i
+                        font = self.parent.image_font["hanzi_font"]
+                    elif text[i] not in self.parent.hanzi_font_chars and font != self.parent.image_font["no_hanzi_font"]:
                         w, h = font.getsize(text[begin: i])
                         self.width += w
                         self.height = max(self.height, h)
                         begin = i
                         font = self.parent.image_font["no_hanzi_font"]
-                    else:
-                        raise NotImplementedError()
-                self.width += font.getsize(text[begin:])[0]
+                w, h = font.getsize(text[begin:])
+                self.width += w
+                self.height = max(self.height, h)
             else:
                 # ！！！这里务必要注意，font.getsize("abc")[0] != sum(font.getsize(k) for k in "abc")
                 # ！！！因此非0字符间距的字符串计算实例宽度时一定要一个字符一个字符地计算
                 for c in text:
                     if c in self.parent.hanzi_font_chars:
-                        self.width += self.parent.image_font["hanzi_font"].getsize(c)[0]
+                        w, h = self.parent.image_font["hanzi_font"].getsize(c)
                     else:
-                        self.width += self.parent.image_font["no_hanzi_font"].getsize(c)[0]
+                        w, h = self.parent.image_font["no_hanzi_font"].getsize(c)
+                    self.width += w
+                    self.height = max(self.height, h)
                 # 加上字符间距
                 self.width += (len(text) - 1) * self.char_spacing
                     
