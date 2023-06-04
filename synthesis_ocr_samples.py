@@ -252,7 +252,7 @@ class DetectionCaseGenerator(object):
             drawer = ImageDraw.Draw(self.canvas_pil)
             self.paint_text(drawer, instance, tl_x, tl_y)
         # 两点框转为四点框
-        label = (x1, y1, x2, y1, x2, y2, x1, y2, category.value)
+        label = (x1, y1, x2, y1, x2, y2, x1, y2, category.value, instance.text)
         self.labels.append(label)
         return label
     
@@ -330,7 +330,7 @@ class DetectionCaseGenerator(object):
             CLASSES = ['ptext', 'htext', 'pformula', 'hformula', 'ld', 'nld', 'oc', 'mixformula',
                     'graph', 'excel', 'p_formula_set', 'p_up_down', 'h_formula_set', 'h_up_down', "subfield"]
             # 9,6,797,5,797,36,9,36,###,subfield
-            label = label[:-1] + (CLASSES[label[-1]],)
+            label = label[:-2] + (CLASSES[label[-2]], label[-1])
             label = list(map(str, label))
             label.insert(8, "###")
             return ','.join(label)
@@ -372,7 +372,7 @@ class DetectionCaseGenerator(object):
 
         canvas_np = np.array(self.canvas_pil).copy()
         for label in self.labels:
-            x1, y1, x2, y2, x3, y3, x4, y4, c = label
+            x1, y1, x2, y2, x3, y3, x4, y4, c, text = label
             cv2.polylines(canvas_np, [np.array([(x1, y1), (x2, y2), (x3, y3), (x4, y4)])], True, COLORS[c + 1])
         save_path = os.path.join(visualization_save_dir, save_name + ".jpg")
         cv2.imwrite(save_path, canvas_np)
@@ -850,7 +850,7 @@ if __name__ == "__main__":
     os.makedirs(image_save_dir, exist_ok=True)
     os.makedirs(label_save_dir, exist_ok=True)
 
-    for gn in trange(config.GENERATION_NUM):
+    for gn in trange(args.generation_num):
         W = np.random.randint(*config.IMAGE_WIDTH)
         H = np.random.randint(*config.IMAGE_HEIGHT)
         FONT_SIZE = np.random.randint(*config.FONT_SIZE)
