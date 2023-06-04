@@ -3,6 +3,7 @@ import urllib.request
 
 
 def download(url, dst_dir, filename="auto"):
+    os.makedirs(dst_dir, exist_ok=True)
     if filename == "auto":
         filename = os.path.basename(url)
     dst_file_path = os.path.join(dst_dir, filename)

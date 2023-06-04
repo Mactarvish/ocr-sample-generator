@@ -23,6 +23,7 @@ def add_cfg_postfix(config):
 
 # 只解析yaml，不解析傻逼py
 def parse_yaml_config(config_path):
+    assert os.path.exists(config_path), config_path
     assert os.path.splitext(config_path)[-1] == ".yaml", "你脑子里有泡啊，用锤子py，老老实实地用yaml"
     config = yaml.unsafe_load(open(config_path))
     print("执行yaml字段后缀补加，后边发现了没见过的字段不要惊讶哦")

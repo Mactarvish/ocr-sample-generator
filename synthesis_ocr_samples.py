@@ -841,43 +841,24 @@ if __name__ == "__main__":
     parser.add_argument("src_yaml_path")
     parser.add_argument("save_dir")
     parser.add_argument("generation_num", type=int)
-    parser.add_argument("--base-name", type=str, default='')
-    parser.add_argument("--only_big", action="store_true")
-    parser.add_argument("--only_small", action="store_true")
     args = parser.parse_args()
 
-    args.src_yaml_path
+    config = parse_yaml_config(args.src_yaml_path)
     os.makedirs(args.save_dir, exist_ok=True)
     image_save_dir = os.path.join(args.save_dir, "images")
     label_save_dir = os.path.join(args.save_dir, "labels")
     os.makedirs(image_save_dir, exist_ok=True)
     os.makedirs(label_save_dir, exist_ok=True)
 
-    for gn in trange(args.generation_num):
-        W = np.random.randint(600, 1000)
-        H = np.random.randint(200, 1000)
-        FONT_SIZE = np.random.randint(15,30)
+    for gn in trange(config.GENERATION_NUM):
+        W = np.random.randint(*config.IMAGE_WIDTH)
+        H = np.random.randint(*config.IMAGE_HEIGHT)
+        FONT_SIZE = np.random.randint(*config.FONT_SIZE)
         # LINE_SPACING = int(10 / 25 * FONT_SIZE)
         LINE_SPACING = max(3, np.random.randint(int(1 / 5 * FONT_SIZE), int(15 / 25 * FONT_SIZE)))
         CHAR_SPACING = random.sample([0,0,0,0,0,1,2,5, 10], 1)[0]
         CHAR_SPACING = random.sample([0,0,0,0,0,], 1)[0]
-        img = Image.new("RGB", (W, H), (255, 255, 255))
-
-        # 生成大条大字图
-        if args.only_big:
-            W = np.random.randint(2500, 3000)
-            H = np.random.randint(200, 500)
-            FONT_SIZE = np.random.randint(80,100)
-            LINE_SPACING = np.random.randint(10, 20)
-            CHAR_SPACING = np.random.randint(40, 60)
-            img = Image.new("RGB", (W, H), (255, 255, 255))
-        elif args.only_small:
-            W = np.random.randint(150, 250)
-            H = np.random.randint(100, 150)
-            FONT_SIZE = np.random.randint(5, 15)
-            LINE_SPACING = np.random.randint(3, 10)
-            CHAR_SPACING = 0
-            img = Image.new("RGB", (W, H), (255, 255, 255))
+        img = Image.new("RGB", (W, H), tuple(config.IMAGE_BASE_COLOR))
 
         cn_font_paths = glob.glob(os.path.join("assets/fonts/cn", "*.ttf"))
         en_font_paths = glob.glob(os.path.join("assets/fonts/en", "*.ttf"))
@@ -887,9 +868,9 @@ if __name__ == "__main__":
 
         g = DetectionCaseGenerator([cn_font_path, en_font_path], img, font_size=FONT_SIZE, line_spacing=LINE_SPACING, char_spacing=CHAR_SPACING,
                                     save_dir=args.save_dir, 
-                                    instance_image_dir_dict={"pformula":"/data1/mchk/dataset/common_ocr/base/pformula/images_cropped_h_lt_60/",
-                                                             "htext":"/data1/mchk/dataset/ai_mark/base/htext_patch/htext/images/",
-                                                             "hformula":"/data1/mchk/dataset/common_ocr/base/handwritting_patch/hformula/images"}
+                                    instance_image_dir_dict={"pformula":"assets/pformula/images/",
+                                                             "htext":"assets/htext/images/",
+                                                             "hformula":"assets/hformula/images/"}
                                     )
 
         tl_y_offset = np.random.randint(0, 40) - 20
@@ -911,8 +892,8 @@ if __name__ == "__main__":
                 line_height = g.put_formula_ptext_graph_line(tl_y, main_lang="chinese")
         # g.aug()
 
-        if args.base_name == '':
-            name = "%d" % gn
+        if config.BASE_NAME == '':
+            name = "%05d" % gn
         else:
-            name = "%s_%d" % (args.base_name, gn)
+            name = "%s_%05d" % (config.BASE_NAME, gn)
         g.save(name, save_visualize=True)
