@@ -791,11 +791,11 @@ class DetectionCaseGenerator(object):
         return max_height
 
     # 参数里这个tl_x是一行的起始位置可能的最左端
-    def put_ptext_line(self, tl_y, tl_x=1):
+    def put_ptext_line(self, main_lang, tl_y, tl_x=1):
         rest_width = self.canvas_pil.size[0]
         text_num = 1
         max_ptext_length = rest_width / text_num / (self.letter_w + self.char_spacing)
-        ptexts = [self.generate_ptext(max(10, np.random.randint(0, max(4, max_ptext_length))), main_lang="chinese") for _ in range(text_num)]
+        ptexts = [self.generate_ptext(max(10, np.random.randint(0, max(4, max_ptext_length))), main_lang) for _ in range(text_num)]
 
         # ptext和pformula填上去之后剩余的空间宽度
         rest_width = self.canvas_pil.size[0] - sum(instance.width for instance in ptexts)
@@ -818,19 +818,6 @@ class DetectionCaseGenerator(object):
             tl_x = label[2] + np.random.randint(1, 20)
         
         return max_height
-
-def formula2img(str_latex, out_file, img_size=(5,3), font_size=16):
-    fig = plt.figure(figsize=img_size)
-    ax = fig.add_axes([0, 0, 1, 1])
-    ax.get_xaxis().set_visible(False)
-    ax.get_yaxis().set_visible(False)
-    ax.set_xticks([])
-    ax.set_yticks([])
-    font_prop = font_manager.FontProperties(fname=song_ttf_path)
-
-    plt.text(0.5, 0.5, str_latex,font_properties=font_prop, fontsize=font_size, verticalalignment='center', horizontalalignment='center')
-    plt.savefig(out_file)
-
 
 def generate_latex(text):
     return f"${' '.join(text)}$"
@@ -883,7 +870,7 @@ if __name__ == "__main__":
             # line_height = g.put_htext_graph_line(tl_y, main_lang="chinese")
             k = np.random.randint(0, 5)
             if True:
-                line_height = g.put_ptext_line(tl_y)
+                line_height = g.put_ptext_line(config.MAIN_LANGUAGE, tl_y)
             elif k == 3:
                 line_height = g.put_formula_ptext_graph_line(tl_y, main_lang="mix")
             elif k == 4:
