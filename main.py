@@ -8,17 +8,18 @@ from PIL import Image
 import numpy as np
 
 from utils.parse_yaml import parse_yaml_config
+from utils.parse_py import parse_py_config
 from core.ocr_sample_generator import OCRSampleGenerator
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("src_yaml_path")
+    parser.add_argument("src_config_path")
     parser.add_argument("save_dir")
     parser.add_argument("generation_num", type=int)
     args = parser.parse_args()
 
-    config = parse_yaml_config(args.src_yaml_path)
+    config = parse_py_config(args.src_config_path)
     os.makedirs(args.save_dir, exist_ok=True)
     image_save_dir = os.path.join(args.save_dir, "images")
     label_save_dir = os.path.join(args.save_dir, "labels")
@@ -29,10 +30,8 @@ if __name__ == "__main__":
         W = np.random.randint(*config.IMAGE_WIDTH)
         H = np.random.randint(*config.IMAGE_HEIGHT)
         FONT_SIZE = np.random.randint(*config.FONT_SIZE)
-        # LINE_SPACING = int(10 / 25 * FONT_SIZE)
         LINE_SPACING = max(3, np.random.randint(int(1 / 5 * FONT_SIZE), int(15 / 25 * FONT_SIZE)))
-        CHAR_SPACING = random.sample([0,0,0,0,0,1,2,5, 10], 1)[0]
-        CHAR_SPACING = random.sample([0,0,0,0,0,], 1)[0]
+        CHAR_SPACING = random.sample(config.CHAR_SPACING, 1)[0]
         img = Image.new("RGB", (W, H), tuple(config.IMAGE_BASE_COLOR))
 
         cn_font_paths = glob.glob(os.path.join("assets/fonts/cn", "*.ttf"))
