@@ -1,7 +1,6 @@
 import sys
 from importlib import import_module
 import os
-from omegaconf import OmegaConf
 
 
 def parse_py_config(src_py_path):
@@ -14,8 +13,7 @@ def parse_py_config(src_py_path):
         for name, value in mod.__dict__.items()
         if not name.startswith('__')
     }
-    config = OmegaConf.create(cfg_dict, flags={"allow_objects": True}) # 套一个OmegaConf可以把每个键变成attribute
-    return config
+    return cfg_dict
 
 if __name__ == "__main__":
     aa = parse_py_config("pgs/pg.py")

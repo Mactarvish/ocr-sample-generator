@@ -13,6 +13,12 @@ from augs import AddBackground
 from .instance import Instance
 from .category import Category
 
+from utils.parse_random import parse_random
+
+
+from matplotlib.colors import hsv_to_rgb
+COLORS = [(hsv_to_rgb([i / 10., 1.0, 1.0]) * 255).astype(int).tolist() for i in range(3)]
+
 
 class OCRSampleGenerator(object):
     def __init__(self, ttf_paths, canvas_pil, font_size, line_spacing, save_dir, char_spacing=0):
@@ -187,15 +193,6 @@ class OCRSampleGenerator(object):
         os.makedirs(self.save_dir, exist_ok=True)
         visualization_save_dir = os.path.join(self.save_dir, "visualization")
         os.makedirs(visualization_save_dir, exist_ok=True)
-        def _to_color(indx, base):
-            """ return (b, r, g) tuple"""
-            base2 = base * base
-            b = 2 - indx / base2
-            r = 2 - (indx % base2) / base
-            g = 2 - (indx % base2) % base
-            return b * 127, r * 127, g * 127
-        base = int(np.ceil(pow(13, 1. / 3)))
-        COLORS = [_to_color(x, base) for x in range(21)]
 
         canvas_np = np.array(self.canvas_pil).copy()
         for label in self.labels:
@@ -214,74 +211,45 @@ class OCRSampleGenerator(object):
         return selected
 
 
-    def generate_ptext_instance(self, length, main_lang="chinese", add_end=False):
-        assert main_lang in ["chinese", "english", "mix"], main_lang
+    def generate_ptext_instance(self, length, context_config, add_end_punctuations=False):
         selected_chars = []
-        if main_lang == "chinese":
-            space_proportion = 0
-            space_num = np.random.randint(0, 3)
-            selected_chars.append(self.sample_chars([' '], space_num))
+        
+        # 计算实例中不同类型字符的数量
+        hanzi_proportion = parse_random(context_config["HANZI_PROPORTION"])
+        letter_proportion = parse_random(context_config["LETTER_PROPORTION"])
+        number_proportion = parse_random(context_config["NUMBER_PROPORTION"])
+        punctuation_proportion = parse_random(context_config["PUNCTUATION_PROPORTION"])
+        space_proportion = parse_random(context_config["SPACE_PROPORTION"])
+        # 不同字符类型比例中，至多有一个是-1，-1的这个类型的实际比例等于 1-其它类型比例之和
+        # 按照 汉字 字母 数字 标点符号 空格 的顺序依次累加比例，如果加到某一项时总比例超过了1，那么后续类型比例直接置0
+        tps = [hanzi_proportion, letter_proportion, number_proportion, punctuation_proportion, space_proportion]
+        m1_index = -1
+        p_sum = 0
+        for i in range(len(tps)):
+            if tps[i] == -1:
+                if m1_index != -1:
+                    raise ValueError(f"不同字符类型比例中，至多有一个是-1 {tps}")
+                m1_index = i
+            else:
+                if p_sum + tps[i] >= 1:
+                    tps[i] = 1 - p_sum
+                p_sum += tps[i]
+        # 出现了-1，计算实际比例
+        if m1_index != -1:
+            tps[m1_index] = 1. - p_sum
+        [hanzi_proportion, letter_proportion, number_proportion, punctuation_proportion, space_proportion] = tps
+        [hanzi_num, letter_num, number_num, punctuation_num, space_num] = [round(e * length) for e in tps]
 
-            # 标点符号个数不超过文本总长度的1/10
-            punctuation_proportion = 1 / 10
-            punctuations_num = int(np.random.power(3) * length * punctuation_proportion)
-            # punctuations_num = np.random.randint(0, length * punctuation_proportion + 1)
-            selected_chars.append(self.sample_chars(self.punctuations, punctuations_num))
-            
-            number_proportion = 1 / 10
-            number_num = int(np.random.power(3) * length * number_proportion)
-            # number_num = np.random.randint(0, length * number_proportion + 1) * 2
-            selected_chars.append(self.sample_chars(self.nums, number_num))
-            
-            # 英文字母个数不超过文本总长度的xx
-            letter_proportion = 1 / 10
-            letter_num = int(np.random.power(3) * length * letter_proportion)
-            # letter_num = np.random.randint(0, length * letter_proportion + 1) * 2
-            selected_chars.append(self.sample_chars(self.letters, letter_num))
-
-            hanzi_num = length - punctuations_num - number_num // 2 - letter_num // 2
-            selected_chars.append(self.sample_chars(self.hanzis, hanzi_num))
-        elif main_lang == "english":
-            space_proportion = 1 / 5
-            space_num = int(np.random.power(3) * length * space_proportion)
-            selected_chars.append(self.sample_chars([' ', ' ', ' ', ', ', '. '], space_num))
-
-            # 标点符号个数不超过文本总长度的xx
-            punctuation_proportion = 1 / 20
-            punctuations_num = int(np.random.power(3) * length * punctuation_proportion)
-            selected_chars.append(self.sample_chars(self.punctuations, punctuations_num))
-
-            number_proportion = 1 / 5
-            number_num = int(np.random.power(3) * length * number_proportion)
-
-            letter_num = length - punctuations_num - number_num // 2 - space_num // 2
-            selected_chars.append(self.sample_chars(self.letters, letter_num))
-        elif main_lang == "mix":
-            space_proportion = 0
-            space_num = np.random.randint(0, 3)
-            selected_chars.append(self.sample_chars([' '], space_num))
-
-            # 标点符号个数不超过文本总长度的1/10
-            punctuation_proportion = 1 / 10
-            punctuations_num = int(np.random.power(3) * length * punctuation_proportion)
-            # punctuations_num = np.random.randint(0, length * punctuation_proportion + 1)
-            selected_chars.append(self.sample_chars(self.punctuations, punctuations_num))
-            
-            number_proportion = 1 / 2
-            number_num = int(np.random.power(3) * length * number_proportion)
-            # number_num = np.random.randint(0, length * number_proportion + 1) * 2
-            selected_chars.append(self.sample_chars(self.nums, number_num))
-            
-            # 英文字母个数不超过文本总长度的xx
-            letter_proportion = 0.7
-            letter_num = int(np.random.power(3) * length * letter_proportion)
-            # letter_num = np.random.randint(0, length * letter_proportion + 1) * 2
-            selected_chars.append(self.sample_chars(self.letters, letter_num))
-
-            hanzi_num = length - punctuations_num - number_num // 2 - letter_num // 2
-            selected_chars.append(self.sample_chars(self.hanzis, hanzi_num))
-        else:
-            raise NotImplementedError(main_lang)
+        # 汉字
+        selected_chars.append(self.sample_chars(self.hanzis, hanzi_num))
+        # 英文字母
+        selected_chars.append(self.sample_chars(self.letters, letter_num))
+        # 数字
+        selected_chars.append(self.sample_chars(self.nums, number_num))
+        # 标点符号
+        selected_chars.append(self.sample_chars(self.punctuations, punctuation_num))
+        # 空格
+        selected_chars.append(self.sample_chars([' '], space_num))
 
         # 所有的字符撮到一块，然后打乱顺序
         selected_chars = list(chain(*selected_chars))
@@ -303,17 +271,19 @@ class OCRSampleGenerator(object):
         selected_chars = selected_chars[i: j + 1]
 
         end = ['']
-        if add_end:
+        if add_end_punctuations:
             end = random.sample(self.punctuations, 1)
         text = ''.join(selected_chars + end)
         print(text)
         return Instance(self, text, Category.PTEXT, char_spacing=self.char_spacing)
 
-    def put_ptext_line(self, main_lang, tl_y, tl_x=1):
-        rest_width = self.canvas_pil.size[0]
-        text_num = 1
-        max_ptext_length = rest_width / text_num / (self.letter_w + self.char_spacing)
-        ptext_instances = [self.generate_ptext_instance(max(10, np.random.randint(0, max(4, max_ptext_length))), main_lang) for _ in range(text_num)]
+    def put_ptext_line(self, context_config, tl_y, tl_x=1):
+        # 一行中的最大实例数量
+        max_instance_num_per_line = 1
+        # 计算在给定的画布尺寸、字符大小和单行实例个数条件下，每个实例的最大长度
+        max_ptext_length = self.canvas_pil.size[0] / max_instance_num_per_line / (self.letter_w + self.char_spacing)
+        # 每个实例至少一个字符
+        ptext_instances = [self.generate_ptext_instance(np.random.randint(1, max_ptext_length), context_config) for _ in range(max_instance_num_per_line)]
 
         # 绘制实例后剩余的空间宽度
         rest_width = self.canvas_pil.size[0] - sum(instance.width for instance in ptext_instances)

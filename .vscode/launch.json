@@ -16,8 +16,17 @@
             "name": "gen",
             "type": "python",
             "request": "launch",
-            "program": "synthesis_ocr_samples.py",
-            "args": ["configs/dummy.py", "pgs", "312"],
+            "program": "main.py",
+            "args": ["configs/chinese.py", "pgs", "312"],
+            "console": "integratedTerminal",
+            "justMyCode": true
+        },
+        {
+            "name": "single",
+            "type": "python",
+            "request": "launch",
+            "program": "main.py",
+            "args": ["configs/single.py", "pgs", "312"],
             "console": "integratedTerminal",
             "justMyCode": true
         }

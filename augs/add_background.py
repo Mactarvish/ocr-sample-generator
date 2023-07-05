@@ -5,8 +5,6 @@ import random
 import numpy as np
 import cv2
 
-import imgaug.augmenters as iaa
-import imgaug as ia
 from imgaug.augmenters import meta
 
         
@@ -24,7 +22,6 @@ class AddBackground(meta.Augmenter):
         assert isinstance(alpha, tuple) and len(alpha) == 2 and alpha[0] >= 0 and alpha[1] >= alpha[0] and alpha[1] <= 1, alpha
         self.alpha = alpha
 
-    # Added in 0.4.0.
     def _augment_batch_(self, batch, random_state, parents, hooks):
         if batch.images is None:
             return batch
