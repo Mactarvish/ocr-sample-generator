@@ -131,3 +131,4 @@ dmypy.json
 pgs/
 *.jpg
 !assets/backgrounds/*.jpg
+!docs/images/*.jpg
