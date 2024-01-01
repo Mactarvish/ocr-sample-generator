@@ -20,10 +20,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     os.makedirs(args.save_dir, exist_ok=True)
-    image_save_dir = os.path.join(args.save_dir, "images")
-    label_save_dir = os.path.join(args.save_dir, "labels")
-    os.makedirs(image_save_dir, exist_ok=True)
-    os.makedirs(label_save_dir, exist_ok=True)
 
     config = parse_py_config(args.src_config_path)
     print(config)
@@ -34,8 +30,10 @@ if __name__ == "__main__":
         FONT_SIZE = parse_random(config["LAYOUT"]["FONT_SIZE"])
         LINE_SPACING = max(3, parse_random(config["LAYOUT"]["LINE_SPACING"]))
         CHAR_SPACING = parse_random(config["LAYOUT"]["CHAR_SPACING"])
+        SAVE_RECTIFIED_LINES_SEPARATELY = config["SAVE_RECTIFIED_LINES_SEPARATELY"] \
+                                            if "SAVE_RECTIFIED_LINES_SEPARATELY" in config else False
         img = Image.new("RGB", (W, H), (255, 255, 255))
-
+        
         cn_font_paths = glob.glob(os.path.join("assets/fonts/cn", "*.ttf"))
         en_font_paths = glob.glob(os.path.join("assets/fonts/en", "*.ttf"))
         
@@ -58,5 +56,5 @@ if __name__ == "__main__":
             name = "%05d" % gn
         else:
             name = "%s_%05d" % (config["BASE_NAME"], gn)
-        g.save(name, save_visualize=True)
+        g.save(name, save_visualize=True, save_rectified_lines_separately=SAVE_RECTIFIED_LINES_SEPARATELY)
 

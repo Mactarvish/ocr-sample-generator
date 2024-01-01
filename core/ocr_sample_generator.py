@@ -1,6 +1,7 @@
 import os
 import random
 from itertools import chain
+import math
 
 from PIL import Image, ImageDraw, ImageFont
 import cv2
@@ -21,7 +22,8 @@ COLORS = [(hsv_to_rgb([i / 10., 1.0, 1.0]) * 255).astype(int).tolist() for i in 
 
 
 class OCRSampleGenerator(object):
-    def __init__(self, ttf_paths, canvas_pil, font_size, line_spacing, save_dir, char_spacing=0):
+    def __init__(self, ttf_paths, canvas_pil, font_size, line_spacing, save_dir, 
+                 char_spacing=0):
         assert isinstance(canvas_pil, Image.Image), type(canvas_pil)
         assert isinstance(ttf_paths, list) and len(ttf_paths) == 2, ttf_paths
         self.canvas_pil = canvas_pil
@@ -159,7 +161,7 @@ class OCRSampleGenerator(object):
         self.labels = [list(map(round, p.coords.reshape(-1).tolist())) + [p.label] + [l[-1]] for p, l in zip(polygons_aug, self.labels)]
         self.canvas_pil = Image.fromarray(images_aug)
 
-    def save(self, save_name, save_visualize=True):
+    def save(self, save_name, save_visualize=True, save_rectified_lines_separately=False):
         def parse_p4c_to_txt_line(label):
             CLASSES = ['ptext']
             # 9,6,797,5,797,36,9,36,###,ptext
@@ -173,25 +175,51 @@ class OCRSampleGenerator(object):
             return
 
         os.makedirs(self.save_dir, exist_ok=True)
-        image_save_dir = os.path.join(self.save_dir, "images")
-        label_save_dir = os.path.join(self.save_dir, "labels")
-        os.makedirs(image_save_dir, exist_ok=True)
-        os.makedirs(label_save_dir, exist_ok=True)
-        image_save_path = os.path.join(image_save_dir, save_name + ".jpg")
-        label_save_path = os.path.join(label_save_dir, save_name + ".txt")
+        global_canvas_save_dir = os.path.join(self.save_dir, "global_canvas", "images")
+        global_label_save_dir = os.path.join(self.save_dir, "global_canvas", "labels")
+        os.makedirs(global_canvas_save_dir, exist_ok=True)
+        os.makedirs(global_label_save_dir, exist_ok=True)
 
-        self.canvas_pil.save(image_save_path)
+
+        global_canvas_save_path = os.path.join(global_canvas_save_dir, save_name + ".jpg")
+        global_label_save_path = os.path.join(global_label_save_dir, save_name + ".txt")
+
+        self.canvas_pil.save(global_canvas_save_path)
         txt_lines = [parse_p4c_to_txt_line(label) for label in self.labels]
-        with open(label_save_path, 'w') as f:
+        with open(global_label_save_path, 'w') as f:
             for line in txt_lines:
                 f.write(line + '\n')
         
         if save_visualize:
             self.visualize(save_name)
 
+        # 逐行保存透视变换后的图像（将旋转后的每行拧回正行）
+        if save_rectified_lines_separately:
+            rectified_lines_save_dir = os.path.join(self.save_dir, "rectified_lines")
+            for i, label in enumerate(self.labels):
+                single_line_save_path = os.path.join(rectified_lines_save_dir, "images", save_name + f"_{i}.jpg")
+                single_label_save_path = os.path.join(rectified_lines_save_dir, "labels", save_name + f"_{i}.txt")
+                os.makedirs(os.path.dirname(single_line_save_path), exist_ok=True)
+                os.makedirs(os.path.dirname(single_label_save_path), exist_ok=True)
+                x1, y1, x2, y2, x3, y3, x4, y4, c, text = label
+                canvas_np = np.array(self.canvas_pil).copy()
+                # 使用变换将四点框转为矩形框
+                src = np.array([(x1, y1), (x2, y2), (x3, y3), (x4, y4)]).astype(np.float32)
+                w = round(math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2))
+                h = round(math.sqrt((x3 - x2) ** 2 + (y3 - y2) ** 2))
+                dst = np.array([(0, 0), (w, 0), (w, h), (0, h)]).astype(np.float32)
+                M = cv2.getPerspectiveTransform(src, dst)
+                rectified_line = cv2.warpPerspective(canvas_np, M, (w, h))
+                rectified_line = Image.fromarray(rectified_line)
+                rectified_line.save(single_line_save_path)
+                label = [0, 0, w, 0, w, h, 0, h, c, text]
+                text_line = parse_p4c_to_txt_line(label)
+                with open(single_label_save_path, 'w') as f:
+                    f.write(text_line + '\n')
+
     def visualize(self, save_name):
         os.makedirs(self.save_dir, exist_ok=True)
-        visualization_save_dir = os.path.join(self.save_dir, "visualization")
+        visualization_save_dir = os.path.join(self.save_dir, "global_canvas", "visualization")
         os.makedirs(visualization_save_dir, exist_ok=True)
 
         canvas_np = np.array(self.canvas_pil).copy()

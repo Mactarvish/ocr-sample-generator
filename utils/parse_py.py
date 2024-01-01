@@ -16,6 +16,6 @@ def parse_py_config(src_py_path):
     return cfg_dict
 
 if __name__ == "__main__":
-    aa = parse_py_config("pgs/pg.py")
+    aa = parse_py_config("configs/single_line_chinese.py")
     print(aa)
     print(aa.ee)
