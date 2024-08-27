@@ -59,5 +59,3 @@ CONTEXT = dict( # 生成图像的文本内容比例配置
 )
 SAVE_RECTIFIED_LINES_SEPARATELY = True # 是否逐行保存，即根据生成的样本把每个文本行裁出来拉正保存（通常用于训练识别模型），使能后会在保存目录下新建一个rectified_lines文件夹保存每张图上的每个文本行
 ```
-
-## 欢迎issue和pr
